@@ -1,7 +1,7 @@
 import { Address } from "viem";
 import POSITIONS_ABI from "./POSITIONS_ABI.json";
 
-export const RPC_URL = `http://localhost:1000`;
+export const RPC_URL = `https://backend.mrfql.my.id`;
 
 export const POSITION_ABI = POSITIONS_ABI;
 
