@@ -13,7 +13,7 @@ import {
   useAccount,
   useBalance,
 } from "wagmi";
-import { parseUnits } from "viem";
+import { parseUnits, formatUnits } from "viem";
 
 import {
   RPC_URL,
@@ -27,6 +27,22 @@ import { fetcher } from "@/src/services/fetcher";
 export default function CountryPage() {
   const { id } = useParams();
   const countryId = typeof id === "string" ? id.toUpperCase() : "";
+
+  // Define interface for Position data returned from smart contract
+  interface PositionData {
+    positionId: bigint;
+    countryId: string;
+    trader: `0x${string}`;
+    direction: number;
+    size: bigint;
+    leverage: number;
+    entryPrice: bigint;
+    openTime: bigint;
+    takeProfit: bigint;
+    stopLoss: bigint;
+    isOpen: boolean;
+    liquidationPrice: bigint;
+  }
 
   const [previousBalance, setPreviousBalance] = useState<number | null>(null);
   const [newBalance, setNewBalance] = useState<number | null>(null);
@@ -59,8 +75,17 @@ export default function CountryPage() {
   }, [data]);
 
   const [tradeId, setTradeId] = useState<string>("");
+  const [transactionStep, setTransactionStep] = useState<'idle' | 'approving' | 'trading' | 'success' | 'error'>('idle');
 
-  const [position, setPosition] = useState({
+  interface TradePosition {
+    size: string;
+    leverage: string;
+    isLong: boolean;
+    entryPrice: number;
+    isOpen?: boolean;
+  }
+
+  const [position, setPosition] = useState<TradePosition>({
     size: "",
     leverage: "1",
     isLong: true,
@@ -82,12 +107,12 @@ export default function CountryPage() {
   const { triggerRefresh } = usePositionsStore();
 
   const { refetch: refetchPositionFromHook } = useReadContract({
-    address: POSITION_ADDRESS[50002],
+    address: POSITION_ADDRESS[84532],
     abi: POSITION_ABI,
     functionName: "getPosition",
     args: [] as const,
     account: address,
-  });
+  }) as { refetch: () => Promise<{ data: PositionData | undefined }> };
 
   const refetchPosition = () => {
     if (address) {
@@ -164,6 +189,8 @@ export default function CountryPage() {
 
   const handlePlaceTrade = async () => {
     try {
+      setTransactionStep('approving');
+      
       if (!id || typeof id !== "string") {
         throw new Error("Country ID is required");
       }
@@ -172,35 +199,98 @@ export default function CountryPage() {
         throw new Error("Wallet not connected");
       }
 
+      // Check USDC balance
+      if (!walletBalance || Number(formatUnits(walletBalance.value, walletBalance.decimals)) < Number(position.size)) {
+        throw new Error(`Insufficient USDC balance. Required: ${position.size} USDC, Available: ${walletBalance ? formatUnits(walletBalance.value, walletBalance.decimals) : '0'} USDC`);
+      }
+
+      // Validate position parameters
+      if (!position.size || Number(position.size) <= 0) {
+        throw new Error("Position size must be greater than 0");
+      }
+
+      if (Number(position.leverage) < 1 || Number(position.leverage) > 5) {
+        throw new Error("Leverage must be between 1 and 5");
+      }
+
       const decimals = 6;
 
-      const sizeInWei = parseUnits(
-        (Number(position.size) * Number(position.leverage)).toString(),
-        decimals
-      );
+      // The contract expects just the position size, not multiplied by leverage
+      const sizeInWei = parseUnits(position.size, decimals);
 
       const newTradeId = `trade-${Date.now()}-${Math.random()
         .toString(36)
         .substr(2, 9)}`;
       setTradeId(newTradeId);
 
+      // 1. First approve the USDC token spending
+      console.log("Approving USDC spending...", {
+        tokenAddress: "0xD0c8dD0F73fdf0f7Dd90960783818A9204c9DB1e",
+        spender: POSITION_ADDRESS[84532],
+        amount: sizeInWei.toString()
+      });
+      
+      const approvalTx = await writeContract({
+        address: "0xD0c8dD0F73fdf0f7Dd90960783818A9204c9DB1e",
+        abi: [
+          {
+            "inputs": [
+              {"internalType": "address", "name": "spender", "type": "address"},
+              {"internalType": "uint256", "name": "amount", "type": "uint256"}
+            ],
+            "name": "approve",
+            "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
+            "stateMutability": "nonpayable",
+            "type": "function"
+          }
+        ],
+        functionName: "approve",
+        args: [POSITION_ADDRESS[84532], sizeInWei],
+      });
+      
+      console.log("Approval transaction hash:", approvalTx);
 
       // Wait for approval confirmation
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+
+      setTransactionStep('trading');
+
+      console.log("Opening position with parameters:", {
+        country: id,
+        direction: position.isLong ? 0 : 1,
+        leverage: Number(position.leverage),
+        size: sizeInWei.toString(),
+        address: address
+      });
+
+      // Check if position already exists
+      try {
+        const existingPosition = await refetchPositionFromHook();
+        console.log("Existing position:", existingPosition.data);
+        
+        if (existingPosition.data && existingPosition.data.isOpen) {
+          throw new Error("Position already exists. Close your current position before opening a new one.");
+        }
+      } catch (positionCheckError) {
+        console.log("Position check result:", positionCheckError);
+        // Continue if position doesn't exist or check fails
+      }
 
       // 2. Open Position
       const tradeTx = await writeContract({
-        address: POSITION_ADDRESS[50002],
+        address: POSITION_ADDRESS[84532],
         abi: POSITION_ABI,
         functionName: "openPosition",
         args: [
           id,
           position.isLong ? 0 : 1,
-          Number(position.leverage),
+          parseInt(position.leverage), // Ensure it's an integer
           sizeInWei,
         ],
       });
       console.log("Trade TX:", tradeTx);
+
+      setTransactionStep('success');
 
       setPosition({
         ...position,
@@ -216,12 +306,30 @@ export default function CountryPage() {
       );
       triggerRefresh();
     } catch (error) {
+      setTransactionStep('error');
       console.error("Error placing trade:", error);
+      
+      // Enhanced error handling to capture revert reasons
       if (error instanceof Error) {
-        alert("Failed to trade: " + error.message);
+        console.error("Error message:", error.message);
+        if (error.message.includes("revert")) {
+          // Try to extract the revert reason
+          const revertMatch = error.message.match(/revert (.+)/);
+          if (revertMatch) {
+            alert("Transaction failed: " + revertMatch[1]);
+          } else {
+            alert("Transaction reverted: " + error.message);
+          }
+        } else {
+          alert("Failed to trade: " + error.message);
+        }
       } else {
+        console.error("Unknown error:", error);
         alert("Failed to trade: " + JSON.stringify(error));
       }
+    } finally {
+      // Reset transaction step after a delay
+      setTimeout(() => setTransactionStep('idle'), 3000);
     }
   };
 
@@ -243,7 +351,7 @@ export default function CountryPage() {
       // Update the existing trade's status to Closed
       if (tradeId) {
         await writeContract({
-          address: POSITION_ADDRESS[50002],
+          address: POSITION_ADDRESS[84532],
           abi: POSITION_ABI,
           functionName: "closePosition",
           args: [
@@ -759,7 +867,7 @@ export default function CountryPage() {
                             Size - Entry Price
                           </div>
                           <div className="self-stretch justify-start text-white text-xs sm:text-sm font-medium font-['Inter'] leading-tight break-all">
-                            ${Number(position.size) * Number(position.leverage)} at {country.markPrice}
+                            ${position.size} (${Number(position.size) * Number(position.leverage)} leveraged) at {country.markPrice}
                           </div>
                         </div>
                       </div>
@@ -792,15 +900,25 @@ export default function CountryPage() {
                     </div>
                   </div>
                   <button
-                    className={`self-stretch h-[60px] px-4 py-2 ${position.size && !isProcessing
+                    className={`self-stretch h-[60px] px-4 py-2 ${position.size && !isProcessing && transactionStep === 'idle'
                       ? "bg-[#155dee]"
                       : "bg-gray-600"
                       } rounded-[100px] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.12)] inline-flex justify-center items-center gap-1`}
-                    disabled={!position.size || isProcessing}
+                    disabled={!position.size || isProcessing || transactionStep !== 'idle'}
                     onClick={handlePlaceTrade}
                   >
                     <div className="text-center justify-center text-white text-xl font-medium font-['Inter'] leading-normal">
-                      {isProcessing ? "Processing..." : "Place Trade"}
+                      {transactionStep === 'approving' 
+                        ? "Approving USDC..." 
+                        : transactionStep === 'trading' 
+                        ? "Opening Position..." 
+                        : transactionStep === 'success'
+                        ? "Success!"
+                        : transactionStep === 'error'
+                        ? "Failed - Try Again"
+                        : isProcessing 
+                        ? "Processing..." 
+                        : "Place Trade"}
                     </div>
                   </button>
                 </div>
