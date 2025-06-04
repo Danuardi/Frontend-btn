@@ -1,13 +1,16 @@
 const mongoose = require("mongoose");
+const { Schema } = mongoose;
 
-const currencyExchangeSchema = new mongoose.Schema({
-  timestamp: { type: Number, required: true },
-  source: { type: String, required: true },
-  quotes: {
-    type: Map, of: Number, required: true
+const currencyExchangeSchema = new Schema(
+  {
+    timestamp: { type: Number, required: true },
+    source: { type: String, required: true },
+    quotes: { type: Object, required: true },
+    short: { type: String, required: true }, // Pastikan field ini ada
+    long: { type: String, required: true }, // Pastikan field ini ada
+    previousRate: { type: String, required: true }, // Menyimpan nilai tukar sebelumnya
   },
-  short: { type: String, required: true },
-  long: { type: String, required: true },
-});
+  { timestamps: true }
+);
 
 module.exports = mongoose.model("CurrencyExchange", currencyExchangeSchema);

@@ -11,7 +11,8 @@ const CARD_METRICS = {
     countryScore: 'COMING SOON',
     volume24h: 'COMING SOON',
     indexPrice: 'COMING SOON',
-    changePercent: '0.0'
+    changePercent: '0.0',    sentiment: 'Bearish',
+    trend: 'down'
 };
 
 const TRADE_METRICS = {
@@ -26,10 +27,12 @@ const TRADE_METRICS = {
         volume24h: 'COMING SOON',
         fundingCooldown: 'COMING SOON'
     },
-    marketInfo: {
+    leaderboard: {
+        status: 'COMING SOON',
+        data: []
+    },    marketInfo: {
         indexPrice: 'COMING SOON',
-        sentiment: 'Neutral',
-        trend: 'neutral',
+        trend: 'down',
         markPrice: 'COMING SOON',
         fundingRate: 'COMING SOON',
         openInterest: 'COMING SOON',

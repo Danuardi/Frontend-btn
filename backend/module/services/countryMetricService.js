@@ -3,6 +3,8 @@ const logger = require('../../bin/helper/logger');
 const { COUNTRY_STATUS, COMING_SOON_METRICS } = require('../../bin/constants/countryStatus');
 const { generateMetricId } = require('../../bin/helper/idGenerator');
 const COUNTRY_DESCRIPTIONS = require('../../bin/constants/countryDescriptions');
+const dataUpdateEmitter = require('../../bin/helper/eventEmitter');
+const finalScoreService = require('./finalScoreService');
 
 const COUNTRY_DATA = {
     'ID': {
@@ -93,13 +95,11 @@ function mapRiskToSentiment(risk) {
         case 'LOW_RISK':
         case 'LOW_MEDIUM_RISK':
             return 'Bullish';
-        case 'MEDIUM_RISK':
-            return 'Neutral';
         case 'MEDIUM_HIGH_RISK':
         case 'HIGH_RISK':
             return 'Bearish';
         default:
-            return 'Neutral';
+            return 'Bullish'; // Default to Bullish if risk level is unknown
     }
 }
 
@@ -131,19 +131,14 @@ async function calculateMetricsForCountry(finalScore, countryCode) {
         // Handle Active countries
         if (!countryData.baseConfig) {
             throw new Error(`Base configuration missing for country ${countryCode}`);
-        }
-
-        if (!finalScore.risk_assessment || !finalScore.risk_assessment.overall_risk) {
-            throw new Error('Invalid final score data structure');
-        }
-
+        }        // Get risk assessment or use default
+        const riskLevel = finalScore?.risk_assessment?.overall_risk || countryData.baseConfig?.defaultRisk || 'LOW_RISK';
+        
         const countryScore = finalScore?.final_score ? 
             Math.round(finalScore.final_score * 20) : 
             countryData.baseConfig.defaultScore;
             
-        const trend = finalScore?.short_term_score && finalScore?.long_term_score ? 
-            (finalScore.short_term_score >= finalScore.long_term_score ? 'up' : 'down') : 
-            'neutral';
+        const trend = finalScore?.short_term_score >= (finalScore?.long_term_score || 0) ? 'up' : 'down';
 
         const changePercent = finalScore.long_term_score !== 0 ? 
             ((finalScore.short_term_score - finalScore.long_term_score) / finalScore.long_term_score * 100).toFixed(1) :
@@ -161,8 +156,7 @@ async function calculateMetricsForCountry(finalScore, countryCode) {
             status: COUNTRY_STATUS.ACTIVE,
             countryScore,
             volume24h: formatCurrency(volume24h),
-            indexPrice: formatCurrency(indexPrice),
-            sentiment: mapRiskToSentiment(finalScore.risk_assessment.overall_risk),
+            indexPrice: formatCurrency(indexPrice),            sentiment: mapRiskToSentiment(riskLevel),
             changePercent: parseFloat(changePercent),
             trend,
             markPrice: formatCurrency(Math.round(countryScore * 500)),
@@ -171,8 +165,11 @@ async function calculateMetricsForCountry(finalScore, countryCode) {
             openTrades: 90000,
             volumes: formatCurrency(220000),
             fundingCooldown: "00:35:10",
-            fundingPercent: "0.0100%",
-            liquidationPrice: "4.87M"
+            fundingPercent: "0.0100%",            liquidationPrice: "4.87M",
+            leaderboard: {
+                status: 'COMING SOON',
+                data: []
+            }
         };
     } catch (error) {
         logger.log('country-metric-service', `Error calculating metrics for country ${countryCode}: ${error.message}`, 'error');
@@ -258,9 +255,7 @@ async function getCountryCardMetrics(countryCode) {
         
         if (!metrics) {
             return null;
-        }
-
-        return {
+        }        return {
             metricId: metrics.metricId,
             code: metrics.code,
             name: metrics.name,
@@ -268,7 +263,9 @@ async function getCountryCardMetrics(countryCode) {
             countryScore: metrics.countryScore,
             volume24h: metrics.volume24h,
             indexPrice: metrics.indexPrice,
-            changePercent: metrics.changePercent
+            changePercent: metrics.changePercent,
+            sentiment: metrics.sentiment,
+            trend: metrics.trend
         };
     } catch (error) {
         logger.log('country-metric-service', `Error getting card metrics for country ${countryCode}: ${error.message}`, 'error');
@@ -297,16 +294,14 @@ async function getTradeDetailMetrics(countryCode) {
                 openTrades: metrics.openTrades,
                 volume24h: metrics.volume24h,
                 fundingCooldown: metrics.fundingCooldown
-            },
-            marketInfo: {
+            },            marketInfo: {
                 indexPrice: metrics.indexPrice,
-                sentiment: metrics.sentiment,
-                trend: metrics.trend,
                 markPrice: metrics.markPrice,
                 fundingRate: metrics.fundingRate,
                 openInterest: metrics.openInterest,
                 liquidationPrice: metrics.liquidationPrice
-            }
+            },
+            leaderboard: metrics.leaderboard
         };
     } catch (error) {
         logger.log('country-metric-service', `Error getting trade metrics for country ${countryCode}: ${error.message}`, 'error');
@@ -324,14 +319,14 @@ async function getAllCardMetrics() {
                     ...cardMetrics,
                     timestamp: new Date().toISOString()
                 });
-            } else {
-                metrics.push({
-                    metricId: generateMetricId(),
+            } else {                metrics.push({
+                    metricId: generateMetricId(code),
                     code,
                     name: country.name,
-                    flag: country.flag,
-                    status: COUNTRY_STATUS.COMING_SOON,
+                    flag: country.flag,                    status: COUNTRY_STATUS.COMING_SOON,
                     ...COMING_SOON_METRICS,
+                    sentiment: '',
+                    trend: 'down',
                     timestamp: new Date().toISOString()
                 });
             }
@@ -358,10 +353,13 @@ async function getAllTradeMetrics() {
                     metricId: generateMetricId(),
                     code,
                     name: country.name,
-                    flag: country.flag,
-                    status: COUNTRY_STATUS.COMING_SOON,
+                    flag: country.flag,                    status: COUNTRY_STATUS.COMING_SOON,
                     about: COUNTRY_DESCRIPTIONS[code] || COUNTRY_DESCRIPTIONS.DEFAULT_COMING_SOON,
                     ...COMING_SOON_METRICS,
+                    leaderboard: {
+                        status: 'COMING SOON',
+                        data: []
+                    },
                     timestamp: new Date().toISOString()
                 });
             }
@@ -372,6 +370,22 @@ async function getAllTradeMetrics() {
         throw error;
     }
 }
+
+// Add event listener for final score updates
+dataUpdateEmitter.on('final-score-updated', async () => {
+    try {
+        const countries = Object.keys(COUNTRY_DATA);
+        for (const countryCode of countries) {
+            if (COUNTRY_DATA[countryCode].status === COUNTRY_STATUS.ACTIVE) {
+                const latestScore = await finalScoreService.getLatestFinalScore();
+                await calculateMetricsForCountry(latestScore, countryCode);
+            }
+        }
+        logger.log('country-metric-service', 'Metrics updated after final score change', 'info');
+    } catch (error) {
+        logger.log('country-metric-service', `Error updating metrics: ${error.message}`, 'error');
+    }
+});
 
 module.exports = {
     getLatestMetrics,

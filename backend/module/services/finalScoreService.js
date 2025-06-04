@@ -1,9 +1,10 @@
-const FinalScore = require("../models/FinalScore");
-const Inflation = require("../models/Inflation");
-const CurrencyExchange = require("../models/CurrencyExchange");
-const Obligasi = require("../models/Obligasi");
-const IndexSaham = require("../models/IndexSaham");
+const FinalScore = require('../models/FinalScore');
+const Inflation = require('../models/Inflation');
+const CurrencyExchange = require('../models/CurrencyExchange');
+const Obligasi = require('../models/Obligasi');
+const IndexSaham = require('../models/IndexSaham');
 const logger = require('../../bin/helper/logger');
+const dataUpdateEmitter = require('../../bin/helper/eventEmitter');
 
 const WEIGHTS = {
   INFLATION: 0.25,
@@ -12,43 +13,20 @@ const WEIGHTS = {
   SAHAM: 0.25
 };
 
-// Normalization ranges
 const RANGES = {
-  INFLATION: { 
-    min: -10, 
-    max: 10,
-    description: "Inflasi tahunan dalam persen"
-  },
-  CURRENCY: { 
-    min: -10, 
-    max: 10,
-    description: "Perubahan nilai tukar dalam persen"
-  },
-  OBLIGASI: { 
-    min: -30, 
-    max: 30,
-    description: "Return obligasi dalam persen"
-  },
-  SAHAM: { 
-    min: -30, 
-    max: 30,
-    description: "Return saham dalam persen"
-  }
+  INFLATION: { min: -10, max: 10, description: "Inflasi tahunan dalam persen" },
+  CURRENCY: { min: -10, max: 10, description: "Perubahan nilai tukar dalam persen" },
+  OBLIGASI: { min: -30, max: 30, description: "Return obligasi dalam persen" },
+  SAHAM: { min: -30, max: 30, description: "Return saham dalam persen" }
 };
 
-// Normalize value to 0-100 scale with boundary check and warning
 function normalizeValue(value, min, max, indicatorName) {
   const ctx = 'normalize-value';
-  
-  // Check for extreme values
   if (value < min || value > max) {
     logger.log(ctx, `Warning: ${indicatorName} value (${value}) is outside normal range [${min}, ${max}]`, 'warning');
   }
 
-  // Clamp value to min-max range
   const clampedValue = Math.max(min, Math.min(max, value));
-  
-  // Log if value was clamped
   if (clampedValue !== value) {
     logger.log(ctx, `Value for ${indicatorName} was clamped from ${value} to ${clampedValue}`, 'warning');
   }
@@ -56,16 +34,14 @@ function normalizeValue(value, min, max, indicatorName) {
   return ((clampedValue - min) / (max - min)) * 100;
 }
 
-// Get risk level based on score
-function getRiskLevel(score) {
-  if (score >= 80) return "LOW_RISK";          // 80-100
-  if (score >= 65) return "LOW_MEDIUM_RISK";   // 65-79
-  if (score >= 45) return "MEDIUM_RISK";       // 45-64
-  if (score >= 30) return "MEDIUM_HIGH_RISK";  // 30-44
-  return "HIGH_RISK";                          // 0-29
+function assessRisk(score) {
+  if (score >= 80) return 'LOW_RISK';
+  if (score >= 65) return 'LOW_MEDIUM_RISK';
+  if (score >= 45) return 'MEDIUM_RISK';
+  if (score >= 30) return 'MEDIUM_HIGH_RISK';
+  return 'HIGH_RISK';
 }
 
-// Add trend analysis function
 function analyzeTrend(current, previous) {
   const percentChange = ((current - previous) / previous) * 100;
   if (Math.abs(percentChange) < 1) return 'STABLE';
@@ -73,88 +49,48 @@ function analyzeTrend(current, previous) {
 }
 
 async function calculateFinalScore() {
-  const ctx = 'final-score-service';
   try {
-    // Get latest data from each indicator
-    const [latestInflation, latestCurrency, latestObligasi, latestSaham] = await Promise.all([
-      Inflation.findOne().sort({ period: -1 }),
+    const [latestCurrency, latestInflation, latestObligasi, latestSaham] = await Promise.all([
       CurrencyExchange.findOne().sort({ timestamp: -1 }),
+      Inflation.findOne().sort({ period: -1 }),
       Obligasi.findOne().sort({ tanggal: -1 }),
       IndexSaham.findOne().sort({ tanggal: -1 })
     ]);
 
-    if (!latestInflation || !latestCurrency || !latestObligasi || !latestSaham) {
-      throw new Error('Missing data for one or more indicators');
+    if (!latestCurrency || !latestInflation || !latestObligasi || !latestSaham) {
+      throw new Error('Missing required indicator data for final score calculation');
     }
 
-    // Calculate scores for each indicator
-    const indicators = [
-      calculateInflationScore(latestInflation),
-      calculateCurrencyScore(latestCurrency),
-      calculateObligasiScore(latestObligasi),
-      calculateSahamScore(latestSaham)
-    ];
+    const inflationScore = calculateInflationScore(latestInflation);
+    const currencyScore = calculateCurrencyScore(latestCurrency);
+    const obligasiScore = calculateObligasiScore(latestObligasi);
+    const sahamScore = calculateSahamScore(latestSaham);
 
-    // Validate indicators
-    indicators.forEach((indicator, index) => {
-      if (isNaN(indicator.short_term) || isNaN(indicator.long_term)) {
-        throw new Error(`Invalid values for ${indicator.name}: short_term=${indicator.short_term}, long_term=${indicator.long_term}`);
-      }
-    });
+    const indicators = [inflationScore, currencyScore, obligasiScore, sahamScore];
 
-    // Calculate weighted scores with validation
-    const weightedScores = indicators.map(indicator => {
-      const shortTermWeighted = indicator.short_term * indicator.weight;
-      const longTermWeighted = indicator.long_term * indicator.weight;
+    const final_score = indicators.reduce((acc, i) => acc + i.short_term_weighted, 0);
+    const short_term_score = indicators.reduce((acc, i) => acc + i.short_term, 0) / indicators.length;
+    const long_term_score = indicators.reduce((acc, i) => acc + i.long_term, 0) / indicators.length;
 
-      if (isNaN(shortTermWeighted) || isNaN(longTermWeighted)) {
-        throw new Error(`Invalid weighted score calculation for ${indicator.name}`);
-      }
-
-      return {
-        ...indicator,
-        short_term_weighted: shortTermWeighted,
-        long_term_weighted: longTermWeighted
-      };
-    });
-
-    // Calculate final scores
-    const short_term_score = weightedScores.reduce((sum, indicator) => {
-      return sum + indicator.short_term_weighted;
-    }, 0);
-    
-    const long_term_score = weightedScores.reduce((sum, indicator) => {
-      return sum + indicator.long_term_weighted;
-    }, 0);
-    
-    const final_score = (short_term_score + long_term_score) / 2;
-
-    if (isNaN(final_score)) {
-      throw new Error('Invalid final score calculation');
-    }
-
-    // Add risk levels
     const risk_assessment = {
-      short_term_risk: getRiskLevel(short_term_score),
-      long_term_risk: getRiskLevel(long_term_score),
-      overall_risk: getRiskLevel(final_score)
+      short_term_risk: assessRisk(short_term_score),
+      long_term_risk: assessRisk(long_term_score),
+      overall_risk: assessRisk(final_score)
     };
 
-    // Save to database
-    const finalScore = new FinalScore({
-      indicators: weightedScores,
+    const result = await new FinalScore({
+      indicators,
       final_score,
       short_term_score,
       long_term_score,
-      risk_assessment
-    });
+      risk_assessment,
+      timestamp: new Date()
+    }).save();
 
-    await finalScore.save();
-    logger.log(ctx, 'Final score calculated and saved successfully', 'calculate final score');
-    
-    return finalScore;
+    dataUpdateEmitter.emit('final-score-updated');
+    return result;
   } catch (error) {
-    logger.log(ctx, `Error calculating final score: ${error.message}`, 'error');
+    logger.log('final-score-service', `Error in calculateFinalScore: ${error.message}`, 'error');
     throw error;
   }
 }
@@ -162,7 +98,6 @@ async function calculateFinalScore() {
 function calculateInflationScore(inflation) {
   const short = parseFloat(inflation.short);
   const long = parseFloat(inflation.long);
-  
   if (isNaN(short) || isNaN(long)) {
     throw new Error(`Invalid inflation values: short=${inflation.short}, long=${inflation.long}`);
   }
@@ -175,6 +110,8 @@ function calculateInflationScore(inflation) {
     short_term: normalizedShort,
     long_term: normalizedLong,
     weight: WEIGHTS.INFLATION,
+    short_term_weighted: normalizedShort * WEIGHTS.INFLATION,
+    long_term_weighted: normalizedLong * WEIGHTS.INFLATION,
     metadata: {
       raw_short: short,
       raw_long: long,
@@ -185,31 +122,22 @@ function calculateInflationScore(inflation) {
 }
 
 function calculateCurrencyScore(currency) {
-  const ctx = 'currency-score';
   const currentRate = parseFloat(currency.short);
   const previousRate = parseFloat(currency.long);
-  
   if (isNaN(currentRate) || isNaN(previousRate)) {
     throw new Error(`Invalid currency values: current=${currentRate}, previous=${previousRate}`);
   }
 
-  logger.log(ctx, `Raw values - Current Rate: ${currentRate}, Previous Rate: ${previousRate}`, 'input');
-
   const percentChange = ((currentRate - previousRate) / previousRate) * 100;
-  logger.log(ctx, `Percentage change: ${percentChange.toFixed(2)}%`, 'calculation');
-
-  if (Math.abs(percentChange) > RANGES.CURRENCY.max) {
-    logger.log(ctx, `Warning: Currency change (${percentChange.toFixed(2)}%) exceeds normal range of ±${RANGES.CURRENCY.max}%`, 'warning');
-  }
-
   const normalizedValue = normalizeValue(percentChange, RANGES.CURRENCY.min, RANGES.CURRENCY.max, 'CURRENCY');
-  logger.log(ctx, `Normalized value: ${normalizedValue.toFixed(2)}`, 'result');
 
   return {
     name: 'CURRENCY',
     short_term: normalizedValue,
     long_term: normalizedValue,
     weight: WEIGHTS.CURRENCY,
+    short_term_weighted: normalizedValue * WEIGHTS.CURRENCY,
+    long_term_weighted: normalizedValue * WEIGHTS.CURRENCY,
     metadata: {
       current_rate: currentRate,
       previous_rate: previousRate,
@@ -223,7 +151,6 @@ function calculateCurrencyScore(currency) {
 function calculateObligasiScore(obligasi) {
   const short_term = parseFloat(obligasi.future_simulation.short.pnl_pct);
   const long_term = parseFloat(obligasi.future_simulation.long.pnl_pct);
-  
   if (isNaN(short_term) || isNaN(long_term)) {
     throw new Error(`Invalid obligasi values: short=${short_term}, long=${long_term}`);
   }
@@ -236,6 +163,8 @@ function calculateObligasiScore(obligasi) {
     short_term: normalizedShort,
     long_term: normalizedLong,
     weight: WEIGHTS.OBLIGASI,
+    short_term_weighted: normalizedShort * WEIGHTS.OBLIGASI,
+    long_term_weighted: normalizedLong * WEIGHTS.OBLIGASI,
     metadata: {
       raw_short: short_term,
       raw_long: long_term,
@@ -248,7 +177,6 @@ function calculateObligasiScore(obligasi) {
 function calculateSahamScore(saham) {
   const pnl = parseFloat(saham.future_info.pnl);
   const margin = parseFloat(saham.future_info.initial_margin);
-  
   if (isNaN(pnl) || isNaN(margin) || margin === 0) {
     throw new Error(`Invalid saham values: pnl=${pnl}, margin=${margin}`);
   }
@@ -261,6 +189,8 @@ function calculateSahamScore(saham) {
     short_term: normalizedValue,
     long_term: normalizedValue,
     weight: WEIGHTS.SAHAM,
+    short_term_weighted: normalizedValue * WEIGHTS.SAHAM,
+    long_term_weighted: normalizedValue * WEIGHTS.SAHAM,
     metadata: {
       raw_pnl: pnl,
       raw_margin: margin,
@@ -271,6 +201,31 @@ function calculateSahamScore(saham) {
   };
 }
 
+const calculateAndUpdateFinalScore = async () => {
+  try {
+    const result = await calculateFinalScore();
+    if (!result) throw new Error('Failed to calculate final score');
+    logger.log('final-score-service', 'Final score updated successfully', 'info');
+    logger.log('final-score-service', `New score: ${result.final_score}`, 'debug');
+    dataUpdateEmitter.emit('final-score-updated');
+    return result;
+  } catch (error) {
+    logger.log('final-score-service', `Error in auto calculation: ${error.message}`, 'error');
+    throw error;
+  }
+};
+
+setInterval(calculateAndUpdateFinalScore, 5 * 60 * 1000);
+
 module.exports = {
-  calculateFinalScore
-}; 
+  calculateFinalScore,
+  calculateAndUpdateFinalScore,
+  getLatestFinalScore: async () => {
+    try {
+      return await FinalScore.findOne().sort({ timestamp: -1 }).lean();
+    } catch (error) {
+      logger.log('final-score-service', `Error getting latest score: ${error.message}`, 'error');
+      throw error;
+    }
+  }
+};
