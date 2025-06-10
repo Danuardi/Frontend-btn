@@ -6,5 +6,5 @@ export const RPC_URL = `https://backend.mrfql.my.id`;
 export const POSITION_ABI = POSITIONS_ABI as Abi;
 
 export const POSITION_ADDRESS: Record<number, Address> = {
-  84532: "0x34662e1BE68A95141550c69c4aD7844EA2314b0D", // Base Sepolia
+  84532: "0xf63B905B1183D2247D313dbb0750C8226f43C8e9", // Base Sepolia
 } as const;
