@@ -169,6 +169,10 @@ async function calculateMetricsForCountry(finalScore, countryCode) {
             leaderboard: {
                 status: 'COMING SOON',
                 data: []
+            },
+            news: {
+                status: 'COMING SOON',
+                data: []
             }
         };
     } catch (error) {
@@ -297,11 +301,11 @@ async function getTradeDetailMetrics(countryCode) {
             },            marketInfo: {
                 indexPrice: metrics.indexPrice,
                 markPrice: metrics.markPrice,
-                fundingRate: metrics.fundingRate,
-                openInterest: metrics.openInterest,
+                fundingRate: metrics.fundingRate,                openInterest: metrics.openInterest,
                 liquidationPrice: metrics.liquidationPrice
             },
-            leaderboard: metrics.leaderboard
+            leaderboard: metrics.leaderboard,
+            news: metrics.news
         };
     } catch (error) {
         logger.log('country-metric-service', `Error getting trade metrics for country ${countryCode}: ${error.message}`, 'error');
@@ -355,12 +359,15 @@ async function getAllTradeMetrics() {
                     name: country.name,
                     flag: country.flag,                    status: COUNTRY_STATUS.COMING_SOON,
                     about: COUNTRY_DESCRIPTIONS[code] || COUNTRY_DESCRIPTIONS.DEFAULT_COMING_SOON,
-                    ...COMING_SOON_METRICS,
-                    leaderboard: {
-                        status: 'COMING SOON',
-                        data: []
-                    },
-                    timestamp: new Date().toISOString()
+                    ...COMING_SOON_METRICS,            leaderboard: {
+                status: 'COMING SOON',
+                data: []
+            },
+            news: {
+                status: 'COMING SOON',
+                data: []
+            },
+            timestamp: new Date().toISOString()
                 });
             }
         }
