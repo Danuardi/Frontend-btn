@@ -5,6 +5,7 @@ const { generateMetricId } = require('../../bin/helper/idGenerator');
 const COUNTRY_DESCRIPTIONS = require('../../bin/constants/countryDescriptions');
 const dataUpdateEmitter = require('../../bin/helper/eventEmitter');
 const finalScoreService = require('./finalScoreService');
+const newsService = require('./newsService');
 
 const COUNTRY_DATA = {
     'ID': {
@@ -277,6 +278,7 @@ async function getCountryCardMetrics(countryCode) {
     }
 }
 
+// Update function getTradeDetailMetrics
 async function getTradeDetailMetrics(countryCode) {
     try {
         const metrics = await getCountryMetrics(countryCode);
@@ -286,6 +288,20 @@ async function getTradeDetailMetrics(countryCode) {
         }
 
         const countryDesc = COUNTRY_DESCRIPTIONS[countryCode] || COUNTRY_DESCRIPTIONS.DEFAULT_COMING_SOON;
+        
+        // Get news for active countries
+        let news = {
+            status: 'COMING SOON',
+            data: []
+        };
+
+        if (COUNTRY_DATA[countryCode].status === COUNTRY_STATUS.ACTIVE) {
+            const newsData = await newsService.getCountryNews(countryCode);
+            news = {
+                status: newsData.length > 0 ? 'SUCCESS' : 'NO_DATA',
+                data: newsData
+            };
+        }
 
         return {
             metricId: metrics.metricId,
@@ -305,7 +321,7 @@ async function getTradeDetailMetrics(countryCode) {
                 liquidationPrice: metrics.liquidationPrice
             },
             leaderboard: metrics.leaderboard,
-            news: metrics.news
+            news
         };
     } catch (error) {
         logger.log('country-metric-service', `Error getting trade metrics for country ${countryCode}: ${error.message}`, 'error');
