@@ -30,7 +30,11 @@ const TRADE_METRICS = {
     leaderboard: {
         status: 'COMING SOON',
         data: []
-    },    marketInfo: {
+    },    news: {
+        status: 'COMING SOON',
+        data: []
+    },
+    marketInfo: {
         indexPrice: 'COMING SOON',
         trend: 'down',
         markPrice: 'COMING SOON',

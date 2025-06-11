@@ -15,9 +15,12 @@ const countryMetricSchema = new mongoose.Schema({
     openTrades: { type: Number },
     volumes: { type: Number },
     fundingCooldown: { type: Number },
-    fundingPercent: { type: Number },
-    liquidationPrice: { type: Number },
+    fundingPercent: { type: Number },    liquidationPrice: { type: Number },
     flag: { type: String, required: true },
+    news: {
+        status: { type: String, default: 'COMING SOON' },
+        data: [{ type: mongoose.Schema.Types.Mixed }]
+    }
 });
 
 countryMetricSchema.index({ countryCode: 1, timestamp: -1 });

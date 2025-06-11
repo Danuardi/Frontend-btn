@@ -15,6 +15,9 @@ const config = {
     currencyExchangeApi: {
         url: process.env.API_URL_CURRENCY,
         access_key: process.env.API_ACCESS_KEY_CURRENCY,
+    },
+    newsDataApi: {
+        apiKey: process.env.NEWSDATA_API_KEY
     }
 };
 const store = new confidence.Store(config);

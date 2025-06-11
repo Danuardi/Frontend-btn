@@ -74,7 +74,6 @@ export default function CountryPage() {
     };
   }, [data]);
 
-  const [tradeId, setTradeId] = useState<string>("");
   const [transactionStep, setTransactionStep] = useState<'idle' | 'approving' | 'trading' | 'success' | 'error'>('idle');
 
   interface TradePosition {
@@ -101,7 +100,6 @@ export default function CountryPage() {
   const { address } = useAccount();
   const { data: walletBalance, refetch: refetchBalance } = useBalance({
     address,
-    token: "0xD0c8dD0F73fdf0f7Dd90960783818A9204c9DB1e",
   });
 
   const { triggerRefresh } = usePositionsStore();
@@ -110,7 +108,7 @@ export default function CountryPage() {
     address: POSITION_ADDRESS[84532],
     abi: POSITION_ABI,
     functionName: "getPosition",
-    args: [] as const,
+    args: [countryId, address] as const,
     account: address,
   }) as { refetch: () => Promise<{ data: PositionData | undefined }> };
 
@@ -189,7 +187,7 @@ export default function CountryPage() {
 
   const handlePlaceTrade = async () => {
     try {
-      setTransactionStep('approving');
+      setTransactionStep('trading');
       
       if (!id || typeof id !== "string") {
         throw new Error("Country ID is required");
@@ -199,9 +197,9 @@ export default function CountryPage() {
         throw new Error("Wallet not connected");
       }
 
-      // Check USDC balance
+      // Check ETH balance
       if (!walletBalance || Number(formatUnits(walletBalance.value, walletBalance.decimals)) < Number(position.size)) {
-        throw new Error(`Insufficient USDC balance. Required: ${position.size} USDC, Available: ${walletBalance ? formatUnits(walletBalance.value, walletBalance.decimals) : '0'} USDC`);
+        throw new Error(`Insufficient ETH balance. Required: ${position.size} ETH, Available: ${walletBalance ? formatUnits(walletBalance.value, walletBalance.decimals) : '0'} ETH`);
       }
 
       // Validate position parameters
@@ -213,53 +211,14 @@ export default function CountryPage() {
         throw new Error("Leverage must be between 1 and 5");
       }
 
-      const decimals = 6;
-
-      // The contract expects just the position size, not multiplied by leverage
-      const sizeInWei = parseUnits(position.size, decimals);
-
-      const newTradeId = `trade-${Date.now()}-${Math.random()
-        .toString(36)
-        .substr(2, 9)}`;
-      setTradeId(newTradeId);
-
-      // 1. First approve the USDC token spending
-      console.log("Approving USDC spending...", {
-        tokenAddress: "0xD0c8dD0F73fdf0f7Dd90960783818A9204c9DB1e",
-        spender: POSITION_ADDRESS[84532],
-        amount: sizeInWei.toString()
-      });
-      
-      const approvalTx = await writeContract({
-        address: "0xD0c8dD0F73fdf0f7Dd90960783818A9204c9DB1e",
-        abi: [
-          {
-            "inputs": [
-              {"internalType": "address", "name": "spender", "type": "address"},
-              {"internalType": "uint256", "name": "amount", "type": "uint256"}
-            ],
-            "name": "approve",
-            "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
-            "stateMutability": "nonpayable",
-            "type": "function"
-          }
-        ],
-        functionName: "approve",
-        args: [POSITION_ADDRESS[84532], sizeInWei],
-      });
-      
-      console.log("Approval transaction hash:", approvalTx);
-
-      // Wait for approval confirmation
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-
-      setTransactionStep('trading');
+      // Convert ETH amount to wei
+      const sizeInWei = parseUnits(position.size, 18);
 
       console.log("Opening position with parameters:", {
         country: id,
         direction: position.isLong ? 0 : 1,
         leverage: Number(position.leverage),
-        size: sizeInWei.toString(),
+        value: sizeInWei.toString(),
         address: address
       });
 
@@ -276,7 +235,7 @@ export default function CountryPage() {
         // Continue if position doesn't exist or check fails
       }
 
-      // 2. Open Position
+      // Open Position with ETH
       const tradeTx = await writeContract({
         address: POSITION_ADDRESS[84532],
         abi: POSITION_ABI,
@@ -285,8 +244,8 @@ export default function CountryPage() {
           id,
           position.isLong ? 0 : 1,
           parseInt(position.leverage), // Ensure it's an integer
-          sizeInWei,
         ],
+        value: sizeInWei, // Send ETH with the transaction
       });
       console.log("Trade TX:", tradeTx);
 
@@ -348,21 +307,26 @@ export default function CountryPage() {
     } else if (closeStep === 3) {
       setCloseStep(4); // Go to step 4
     } else if (closeStep === 4) {
-      // Update the existing trade's status to Closed
-      if (tradeId) {
-        await writeContract({
-          address: POSITION_ADDRESS[84532],
-          abi: POSITION_ABI,
-          functionName: "closePosition",
-          args: [
-            address as `0x${string}`,
-          ],
-        });
-
+      // Close position using user's address
+      try {
+        if (address) {
+          await writeContract({
+            address: POSITION_ADDRESS[84532],
+            abi: POSITION_ABI,
+            functionName: "closePosition",
+            args: [
+              address,
+            ],
+          });
+        } else {
+          throw new Error("Wallet address not available");
+        }
+      } catch (error) {
+        console.error("Error closing position:", error);
+        // Handle error appropriately
       }
       setCloseStep(99); // Go to history table
       setShowPosition(false);
-      setTradeId(""); // Clear the trade ID
     } else if (closeStep === 99) {
       setCloseStep(null); // Close the entire flow
     }

@@ -1,495 +1,547 @@
 [
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "_usdc",
-        "type": "address"
-      }
-    ],
-    "stateMutability": "nonpayable",
-    "type": "constructor"
-  },
-  {
-    "inputs": [],
-    "name": "LeverageShouldBeBetweenOneAndFive",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "Liquidated",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "NotTheOwner",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "PositionAlreadyExist",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "PositionDoesNotExist",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "SizeShouldBeGreaterThanZero",
-    "type": "error"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "uint256",
-        "name": "positionId",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "string",
-        "name": "countryId",
-        "type": "string"
-      },
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "trader",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "enum PrepetualPredictionMarket.PositionDirection",
-        "name": "direction",
-        "type": "uint8"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "size",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint8",
-        "name": "leverage",
-        "type": "uint8"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "entryPrice",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "liquidationPrice",
-        "type": "uint256"
-      }
-    ],
-    "name": "LimitPositionOpened",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
-        "internalType": "address",
-        "name": "sender",
-        "type": "address"
-      }
-    ],
-    "name": "PositionClosed",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "uint256",
-        "name": "positionId",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "string",
-        "name": "countryId",
-        "type": "string"
-      },
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "trader",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "enum PrepetualPredictionMarket.PositionDirection",
-        "name": "direction",
-        "type": "uint8"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "size",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint8",
-        "name": "leverage",
-        "type": "uint8"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "entryPrice",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "liquidationPrice",
-        "type": "uint256"
-      }
-    ],
-    "name": "PositionOpened",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
-        "internalType": "address",
-        "name": "sender",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "takeProfit",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "stopLoss",
-        "type": "uint256"
-      }
-    ],
-    "name": "TPSLSet",
-    "type": "event"
-  },
-  {
-    "inputs": [],
-    "name": "CURRENT_PRICE",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "MAINTENANCE_MARGIN",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "TRANSACTION_FEE",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "_sender",
-        "type": "address"
-      }
-    ],
-    "name": "calculateLiquidation",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "sender",
-        "type": "address"
-      }
-    ],
-    "name": "closePosition",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "getPosition",
-    "outputs": [
-      {
-        "components": [
-          {
-            "internalType": "uint256",
-            "name": "positionId",
-            "type": "uint256"
-          },
-          {
-            "internalType": "string",
-            "name": "countryId",
-            "type": "string"
-          },
-          {
-            "internalType": "address",
-            "name": "trader",
-            "type": "address"
-          },
-          {
-            "internalType": "enum PrepetualPredictionMarket.PositionDirection",
-            "name": "direction",
-            "type": "uint8"
-          },
-          {
-            "internalType": "uint256",
-            "name": "size",
-            "type": "uint256"
-          },
-          {
-            "internalType": "uint8",
-            "name": "leverage",
-            "type": "uint8"
-          },
-          {
-            "internalType": "uint256",
-            "name": "entryPrice",
-            "type": "uint256"
-          },
-          {
-            "internalType": "uint256",
-            "name": "openTime",
-            "type": "uint256"
-          },
-          {
-            "internalType": "uint256",
-            "name": "takeProfit",
-            "type": "uint256"
-          },
-          {
-            "internalType": "uint256",
-            "name": "stopLoss",
-            "type": "uint256"
-          },
-          {
-            "internalType": "bool",
-            "name": "isOpen",
-            "type": "bool"
-          },
-          {
-            "internalType": "uint256",
-            "name": "liquidationPrice",
-            "type": "uint256"
-          }
+    {
+        "inputs": [],
+        "name": "InsufficientETH",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "LeverageShouldBeBetweenOneAndFive",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "Liquidated",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "NotTheOwner",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "PositionAlreadyExist",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "PositionDoesNotExist",
+        "type": "error"
+    },
+    {
+        "inputs": [],
+        "name": "SizeShouldBeGreaterThanZero",
+        "type": "error"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": true,
+                "internalType": "uint256",
+                "name": "positionId",
+                "type": "uint256"
+            },
+            {
+                "indexed": false,
+                "internalType": "string",
+                "name": "countryId",
+                "type": "string"
+            },
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "trader",
+                "type": "address"
+            },
+            {
+                "indexed": false,
+                "internalType": "enum PredictionMarket.PositionDirection",
+                "name": "direction",
+                "type": "uint8"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "size",
+                "type": "uint256"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint8",
+                "name": "leverage",
+                "type": "uint8"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "entryPrice",
+                "type": "uint256"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "liquidationPrice",
+                "type": "uint256"
+            }
         ],
-        "internalType": "struct PrepetualPredictionMarket.Position",
-        "name": "",
-        "type": "tuple"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "string",
-        "name": "countryId",
-        "type": "string"
-      },
-      {
-        "internalType": "enum PrepetualPredictionMarket.PositionDirection",
-        "name": "direction",
-        "type": "uint8"
-      },
-      {
-        "internalType": "uint8",
-        "name": "leverage",
-        "type": "uint8"
-      },
-      {
-        "internalType": "uint256",
-        "name": "size",
-        "type": "uint256"
-      }
-    ],
-    "name": "openPosition",
-    "outputs": [
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "name": "positionIdToPosition",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "name": "positions",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "positionId",
-        "type": "uint256"
-      },
-      {
-        "internalType": "string",
-        "name": "countryId",
-        "type": "string"
-      },
-      {
-        "internalType": "address",
-        "name": "trader",
-        "type": "address"
-      },
-      {
-        "internalType": "enum PrepetualPredictionMarket.PositionDirection",
-        "name": "direction",
-        "type": "uint8"
-      },
-      {
-        "internalType": "uint256",
-        "name": "size",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint8",
-        "name": "leverage",
-        "type": "uint8"
-      },
-      {
-        "internalType": "uint256",
-        "name": "entryPrice",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "openTime",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "takeProfit",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "stopLoss",
-        "type": "uint256"
-      },
-      {
-        "internalType": "bool",
-        "name": "isOpen",
-        "type": "bool"
-      },
-      {
-        "internalType": "uint256",
-        "name": "liquidationPrice",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "takeProfit",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "stopLoss",
-        "type": "uint256"
-      }
-    ],
-    "name": "setTPSL",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "newPrice",
-        "type": "uint256"
-      }
-    ],
-    "name": "updatePrice",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  }
+        "name": "LimitPositionOpened",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": true,
+                "internalType": "uint256",
+                "name": "positionId",
+                "type": "uint256"
+            },
+            {
+                "indexed": false,
+                "internalType": "string",
+                "name": "countryId",
+                "type": "string"
+            },
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "trader",
+                "type": "address"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "size",
+                "type": "uint256"
+            },
+            {
+                "indexed": false,
+                "internalType": "int256",
+                "name": "pnl",
+                "type": "int256"
+            },
+            {
+                "indexed": false,
+                "internalType": "bool",
+                "name": "liquidated",
+                "type": "bool"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "exitPrice",
+                "type": "uint256"
+            }
+        ],
+        "name": "PositionClosed",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": true,
+                "internalType": "uint256",
+                "name": "positionId",
+                "type": "uint256"
+            },
+            {
+                "indexed": false,
+                "internalType": "string",
+                "name": "countryId",
+                "type": "string"
+            },
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "trader",
+                "type": "address"
+            },
+            {
+                "indexed": false,
+                "internalType": "enum PredictionMarket.PositionDirection",
+                "name": "direction",
+                "type": "uint8"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "size",
+                "type": "uint256"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "entryPrice",
+                "type": "uint256"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "liquidationPrice",
+                "type": "uint256"
+            }
+        ],
+        "name": "PositionOpened",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": false,
+                "internalType": "address",
+                "name": "sender",
+                "type": "address"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "takeProfit",
+                "type": "uint256"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "stopLoss",
+                "type": "uint256"
+            }
+        ],
+        "name": "TPSLSet",
+        "type": "event"
+    },
+    {
+        "inputs": [],
+        "name": "CURRENT_PRICE",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "MAINTENANCE_MARGIN",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "TRANSACTION_FEE",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "_sender",
+                "type": "address"
+            }
+        ],
+        "name": "calculateLiquidation",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "sender",
+                "type": "address"
+            }
+        ],
+        "name": "closePosition",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "_sender",
+                "type": "address"
+            },
+            {
+                "internalType": "uint256",
+                "name": "positionId",
+                "type": "uint256"
+            }
+        ],
+        "name": "executeLimitOrder",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "getPosition",
+        "outputs": [
+            {
+                "components": [
+                    {
+                        "internalType": "uint256",
+                        "name": "positionId",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "string",
+                        "name": "countryId",
+                        "type": "string"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "trader",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "enum PredictionMarket.PositionDirection",
+                        "name": "direction",
+                        "type": "uint8"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "size",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint8",
+                        "name": "leverage",
+                        "type": "uint8"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "entryPrice",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "openTime",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "takeProfit",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "stopLoss",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "bool",
+                        "name": "isOpen",
+                        "type": "bool"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "liquidationPrice",
+                        "type": "uint256"
+                    }
+                ],
+                "internalType": "struct PredictionMarket.Position",
+                "name": "",
+                "type": "tuple"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "string",
+                "name": "countryId",
+                "type": "string"
+            },
+            {
+                "internalType": "uint8",
+                "name": "leverage",
+                "type": "uint8"
+            },
+            {
+                "internalType": "uint256",
+                "name": "_entryPrice",
+                "type": "uint256"
+            },
+            {
+                "internalType": "enum PredictionMarket.PositionDirection",
+                "name": "_direction",
+                "type": "uint8"
+            }
+        ],
+        "name": "limitOrder",
+        "outputs": [],
+        "stateMutability": "payable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "string",
+                "name": "countryId",
+                "type": "string"
+            },
+            {
+                "internalType": "enum PredictionMarket.PositionDirection",
+                "name": "direction",
+                "type": "uint8"
+            },
+            {
+                "internalType": "uint8",
+                "name": "leverage",
+                "type": "uint8"
+            }
+        ],
+        "name": "openPosition",
+        "outputs": [
+            {
+                "internalType": "address",
+                "name": "",
+                "type": "address"
+            }
+        ],
+        "stateMutability": "payable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "",
+                "type": "address"
+            }
+        ],
+        "name": "positionIdToPosition",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "",
+                "type": "address"
+            }
+        ],
+        "name": "positions",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "positionId",
+                "type": "uint256"
+            },
+            {
+                "internalType": "string",
+                "name": "countryId",
+                "type": "string"
+            },
+            {
+                "internalType": "address",
+                "name": "trader",
+                "type": "address"
+            },
+            {
+                "internalType": "enum PredictionMarket.PositionDirection",
+                "name": "direction",
+                "type": "uint8"
+            },
+            {
+                "internalType": "uint256",
+                "name": "size",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint8",
+                "name": "leverage",
+                "type": "uint8"
+            },
+            {
+                "internalType": "uint256",
+                "name": "entryPrice",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "openTime",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "takeProfit",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "stopLoss",
+                "type": "uint256"
+            },
+            {
+                "internalType": "bool",
+                "name": "isOpen",
+                "type": "bool"
+            },
+            {
+                "internalType": "uint256",
+                "name": "liquidationPrice",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "uint256",
+                "name": "takeProfit",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "stopLoss",
+                "type": "uint256"
+            }
+        ],
+        "name": "setTPSL",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    }
 ]
